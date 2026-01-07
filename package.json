@@ -1,0 +1,30 @@
+{
+  "name": "ip-changer",
+  "version": "1.0.0",
+  "description": "Node.js Web dashboard to manage Linux IP configuration via SSH.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node src/server.js",
+    "test": "echo \"No tests defined\""
+  },
+  "keywords": [
+    "ssh",
+    "network",
+    "ip",
+    "netplan",
+    "nmcli",
+    "debian",
+    "centos",
+    "ubuntu"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^5.2.1",
+    "ip": "^2.0.1",
+    "js-yaml": "^4.1.1",
+    "socket.io": "^4.8.3",
+    "ssh2": "^1.17.0"
+  }
+}

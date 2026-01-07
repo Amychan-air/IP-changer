@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Linux IP Manager</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" />
+    <style>
+        :root {
+            color-scheme: light;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            line-height: 1.3;
+            background: #f5f5f5;
+            color: #333;
+            overflow-y: auto;
+            height: 100vh;
+        }
+        main {
+            padding: 10px 16px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .card {
+            background: #fff;
+            border-radius: 6px;
+            padding: 16px 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        h1 {
+            font-size: 20px;
+            margin: 0 0 4px;
+            color: #2c3e50;
+            font-weight: 700;
+            text-align: center;
+        }
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 12px;
+            margin-bottom: 12px;
+        }
+        .main-container {
+            display: flex;
+            gap: 16px;
+            flex: 1;
+            overflow: hidden;
+        }
+        .left-side {
+            width: 300px;
+            min-width: 250px;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .resizer {
+            width: 4px;
+            cursor: col-resize;
+            background: #eee;
+            transition: background 0.2s;
+            flex-shrink: 0;
+            border-radius: 2px;
+            margin: 0 -2px;
+            z-index: 10;
+        }
+        .resizer:hover, .resizer.dragging {
+            background: #3498db;
+            width: 4px;
+        }
+        .right-side {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow: hidden;
+        }
+        .config-section {
+            padding: 10px;
+            background: #fafafa;
+            border-radius: 4px;
+            border: 1px solid #e8e8e8;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        .config-section header {
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding-bottom: 4px;
+            border-bottom: 2px solid #3498db;
+        }
+        .config-section header::before {
+            content: "▸";
+            color: #3498db;
+            font-size: 14px;
+            line-height: 1;
+        }
+        .section-content {
+            overflow-y: auto;
+            flex: 1;
+            min-height: 0;
+            padding-right: 4px;
+        }
+        .selector {
+            margin-bottom: 10px;
+        }
+        .selector-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 4px;
+            display: block;
+        }
+        .input-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .input-row input,
+        .input-row select {
+            padding: 6px 8px;
+            border-radius: 3px;
+            border: 1px solid #ddd;
+            font-size: 12px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            background: #fff;
+            width: 100%;
+            font-family: inherit;
+        }
+        .input-row input:focus,
+        .input-row select:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.1);
+        }
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        button.option {
+            padding: 6px 12px;
+            border-radius: 3px;
+            border: 1px solid #ddd;
+            background: #fff;
+            color: #555;
+            font-weight: 500;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s ease;
+        }
+        button.option:hover {
+            border-color: #3498db;
+            color: #3498db;
+            background: #f8fbff;
+        }
+        button.option.active {
+            background: #3498db;
+            border-color: #2980b9;
+            color: #fff;
+        }
+        button.primary {
+            background: #3498db;
+            color: white;
+            border: none;
+            box-shadow: 0 1px 3px rgba(52, 152, 219, 0.2);
+        }
+        button.primary:hover {
+            background: #2980b9;
+        }
+        button.danger {
+            background: #e74c3c;
+            color: white;
+            border: none;
+        }
+        button.danger:hover {
+            background: #c0392b;
+        }
+        button.success {
+            background: #2ecc71;
+            color: white;
+            border: none;
+        }
+        button.success:hover {
+            background: #27ae60;
+        }
+        
+        /* Terminal */
+        #terminal-container {
+            flex: 1;
+            background: #0f172a;
+            border-radius: 4px;
+            padding: 4px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        #terminal {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* Tabs */
+        .preset-tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #e8e8e8;
+            padding-bottom: 0;
+            overflow-x: auto;
+        }
+        .preset-tab {
+            padding: 6px 12px;
+            border: 1px solid transparent;
+            border-bottom: none;
+            background: transparent;
+            color: #666;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 4px 4px 0 0;
+            transition: all 0.2s ease;
+        }
+        .preset-tab:hover {
+            color: #3498db;
+            background: #f8fbff;
+        }
+        .preset-tab.active {
+            color: #3498db;
+            background: #fff;
+            border-color: #e8e8e8;
+            border-bottom-color: #fff;
+            margin-bottom: -1px;
+            z-index: 1;
+        }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+        th, td {
+            padding: 6px 8px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background: #f8f9fa;
+            font-weight: 700;
+            color: #2c3e50;
+            position: sticky;
+            top: 0;
+        }
+        tr:hover {
+            background: #f8fbff;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            background: #eee;
+            color: #555;
+            margin-left: 4px;
+        }
+        .badge.blue { background: #e3f2fd; color: #1976d2; }
+        .badge.green { background: #e8f5e9; color: #2e7d32; }
+        .badge.red { background: #ffebee; color: #c62828; }
+        
+        .toast {
+            position: fixed;
+            left: 50%;
+            bottom: 20px;
+            transform: translateX(-50%);
+            background: #2c3e50;
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 3px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+            font-size: 12px;
+            z-index: 1000;
+        }
+        .toast.show { opacity: 1; }
+
+        .hidden { display: none !important; }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #999; }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+        }
+        .status-dot.green { background: #2ecc71; }
+        .status-dot.red { background: #e74c3c; }
+        .status-dot.grey { background: #bdc3c7; }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+        }
+        .modal-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal {
+            background: #fff;
+            border-radius: 6px;
+            width: 600px;
+            max-width: 90vw;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .modal-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid #eee;
+            font-weight: 700;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-body {
+            padding: 16px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .modal-footer {
+            padding: 12px 16px;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+        pre.cmd-preview {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 4px;
+            border: 1px solid #e8e8e8;
+            overflow-x: auto;
+            margin: 0;
+            font-family: Consolas, monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <div class="card">
+            <h1>Linux IP Manager</h1>
+            <div class="subtitle">SSH & Network Configuration</div>
+
+            <div class="main-container">
+                <!-- Left Side: Connection & Terminal -->
+                <div class="left-side" id="left-panel">
+                    <!-- Connection Panel -->
+                    <section class="config-section" style="flex: 0 0 auto;">
+                        <header>Connection 設定</header>
+                        <div class="section-content">
+                            <div class="input-row" style="margin-bottom: 8px;">
+                                <label class="selector-label">Host IP</label>
+                                <input id="host" placeholder="1.2.3.4" />
+                            </div>
+                            <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                                <div class="input-row" style="flex: 1;">
+                                    <label class="selector-label">Port</label>
+                                    <input id="port" value="22" type="number" />
+                                </div>
+                                <div class="input-row" style="flex: 1;">
+                                    <label class="selector-label">User</label>
+                                    <input id="user" value="root" />
+                                </div>
+                            </div>
+                            <div class="input-row" style="margin-bottom: 8px;">
+                                <label class="selector-label">Password</label>
+                                <input id="pass" type="password" />
+                            </div>
+                            <div class="input-row" style="margin-bottom: 12px;">
+                                <label class="selector-label">Config Mode</label>
+                                <select id="manualMode">
+                                    <option value="">Auto Detect (Recommended)</option>
+                                    <option value="centos">CentOS (nmcli)</option>
+                                    <option value="ubuntu">Ubuntu (Netplan)</option>
+                                    <option value="debian">Debian (interfaces)</option>
+                                    <option value="generic">Generic (ip addr)</option>
+                                </select>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button id="connectBtn" class="option primary" style="flex: 2; justify-content: center; display: flex; align-items: center;">
+                                    Connect SSH
+                                </button>
+                                <button id="logoutBtn" class="option danger" style="flex: 1; justify-content: center; display: none; align-items: center;">
+                                    Logout
+                                </button>
+                            </div>
+                            <div id="connectStatus" style="margin-top: 8px; font-size: 11px; text-align: center; color: #666; display: flex; align-items: center; justify-content: center;">
+                                <span class="status-dot grey" id="statusDot"></span>
+                                <span id="statusText">Disconnected</span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Terminal Panel -->
+                    <section class="config-section" style="flex: 1; display: flex; flex-direction: column;">
+                        <header>Terminal</header>
+                        <div id="terminal-container">
+                            <div id="terminal"></div>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Resizer -->
+                <div class="resizer" id="drag-resizer"></div>
+
+                <!-- Right Side: IP Management -->
+                <div class="right-side">
+                    <!-- Top: IP Configuration -->
+                    <section class="config-section" style="flex: 0 0 auto;">
+                        <header>IP Configuration 新增 IP</header>
+                        <div class="section-content">
+                            <div style="display: flex; gap: 16px;">
+                                <div style="flex: 1;">
+                                    <div class="input-row" style="margin-bottom: 8px;">
+                                        <label class="selector-label">IP Address / CIDR (Range supported, e.g. 192.168.1.10-20)</label>
+                                        <input id="ipInput" placeholder="e.g. 192.168.1.10/24 or 192.168.1.10-20" />
+                                    </div>
+                                    <div style="display: flex; gap: 10px; margin-bottom: 8px;">
+                                        <div class="input-row" style="flex: 1;">
+                                            <label class="selector-label">Gateway</label>
+                                            <input id="gatewayInput" placeholder="Optional" />
+                                        </div>
+                                        <div class="input-row" style="width: 80px;">
+                                            <label class="selector-label">Prefix / Mask</label>
+                                            <input id="prefix" placeholder="24" type="number" />
+                                        </div>
+                                    </div>
+                                    <div class="input-row" style="margin-bottom: 8px;">
+                                        <label class="selector-label">DNS Servers (comma separated)</label>
+                                        <input id="dns" value="8.8.8.8, 1.1.1.1" />
+                                    </div>
+                                </div>
+                                <div style="width: 200px; display: flex; flex-direction: column; gap: 8px; justify-content: flex-end;">
+                                    <button id="calcBtn" class="option" style="width: 100%;">Calculate / Preview</button>
+                                    <div style="display: flex; gap: 4px;">
+                                        <button id="copyCmdBtn" class="option" style="flex: 1; display: none;" title="Generate Command">Copy Cmd</button>
+                                        <button id="applyBtn" class="option success" style="flex: 1; display: none;">Apply</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Calculation Result Preview -->
+                            <div id="calcResults" style="margin-top: 10px; font-size: 11px; background: #fff; border: 1px solid #eee; padding: 8px; border-radius: 4px; max-height: 100px; overflow-y: auto; display: none;">
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Bottom: Interface Management -->
+                    <section class="config-section" style="flex: 1; display: flex; flex-direction: column;">
+                        <header>
+                            <div style="flex: 1;">Interface Management 管理</div>
+                            <button id="refreshIpsBtn" class="option" style="padding: 2px 8px; font-size: 10px;">Refresh</button>
+                        </header>
+                        
+                        <!-- Tabs -->
+                        <div id="interfaceTabs" class="preset-tabs">
+                            <!-- Generated by JS -->
+                            <div class="preset-tab" style="pointer-events: none; color: #999;">Not connected</div>
+                        </div>
+
+                        <!-- Content Table -->
+                        <div class="section-content" style="background: #fff; border: 1px solid #e8e8e8; border-radius: 4px; padding: 0;">
+                            <div class="table-wrapper" style="height: 100%; overflow: auto;">
+                                <table id="ipTable">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 30px;"><input type="checkbox" id="selectAllCheckbox"></th>
+                                            <th>IP Address</th>
+                                            <th>Gateway</th>
+                                            <th>Status</th>
+                                            <th style="text-align: right;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="ipTableBody">
+                                        <tr><td colspan="5" style="text-align: center; color: #999; padding: 20px;">Please connect to host first</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Bottom Actions -->
+                        <div class="actions" style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                            <div style="display: flex; gap: 8px;">
+                                <button id="deleteSelectedBtn" class="option danger" style="display: none;">Delete Selected</button>
+                                <button id="pingSelectedBtn" class="option" style="display: none;">Ping Selected</button>
+                            </div>
+                            <div id="gatewaySection" style="display: none; align-items: center; gap: 6px;">
+                                <label style="font-size: 11px; color: #555; font-weight: 600;">Default Gateway:</label>
+                                <input id="ifaceGateway" style="width: 110px; padding: 3px 6px; font-size: 11px; border: 1px solid #ddd; border-radius: 3px;" placeholder="Manual Input" />
+                                <button id="updateGatewayBtn" class="option primary" style="padding: 3px 8px; font-size: 10px;">Update</button>
+                            </div>
+                            <div id="interfaceInfo" style="font-size: 11px; color: #7f8c8d;"></div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </main>
+    <div class="toast" role="status"></div>
+
+    <!-- Command Modal -->
+    <div class="modal-overlay" id="cmdModal">
+        <div class="modal">
+            <div class="modal-header">
+                <span>Generated Command Preview</span>
+                <button class="option" onclick="closeModal()" style="padding: 2px 6px;">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-top: 0; font-size: 12px; color: #666; margin-bottom: 8px;">
+                    These commands will be executed on the server. You can copy and run them manually if you prefer.
+                </p>
+                <pre class="cmd-preview" id="cmdContent"></pre>
+            </div>
+            <div class="modal-footer">
+                <button class="option" onclick="closeModal()">Close</button>
+                <button class="option primary" onclick="copyToClipboard()">Copy to Clipboard</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.7.0/lib/xterm-addon-fit.min.js"></script>
+    <script>
+        // Init Xterm
+        const term = new Terminal({
+            cursorBlink: true,
+            fontSize: 12,
+            fontFamily: 'Consolas, monospace',
+            theme: {
+                background: '#0f172a',
+                foreground: '#e2e8f0'
+            },
+            rows: 24,
+            cols: 80
+        });
+        const fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+        term.open(document.getElementById('terminal'));
+        fitAddon.fit();
+        
+        window.addEventListener('resize', () => fitAddon.fit());
+
+        // State
+        const state = {
+            currentHostId: null,
+            interfaces: [], // list of interface names
+            currentInterface: null,
+            ipData: { list: [], gateways: {} },
+            calculatedIps: null,
+            selectedIps: new Set()
+        };
+        const socket = io();
+
+        // DOM Elements
+        const els = {
+            connectBtn: document.getElementById('connectBtn'),
+            logoutBtn: document.getElementById('logoutBtn'),
+            statusDot: document.getElementById('statusDot'),
+            statusText: document.getElementById('statusText'),
+            calcBtn: document.getElementById('calcBtn'),
+            applyBtn: document.getElementById('applyBtn'),
+            copyCmdBtn: document.getElementById('copyCmdBtn'),
+            refreshIpsBtn: document.getElementById('refreshIpsBtn'),
+            deleteSelectedBtn: document.getElementById('deleteSelectedBtn'),
+            pingSelectedBtn: document.getElementById('pingSelectedBtn'),
+            interfaceTabs: document.getElementById('interfaceTabs'),
+            ipTableBody: document.getElementById('ipTableBody'),
+            selectAllCheckbox: document.getElementById('selectAllCheckbox'),
+            calcResults: document.getElementById('calcResults'),
+            toast: document.querySelector('.toast'),
+            cmdModal: document.getElementById('cmdModal'),
+            cmdContent: document.getElementById('cmdContent'),
+            ifaceGateway: document.getElementById('ifaceGateway'),
+            updateGatewayBtn: document.getElementById('updateGatewayBtn'),
+            gatewaySection: document.getElementById('gatewaySection')
+        };
+
+        // Socket Events
+        socket.on('connect', () => {
+            term.write('\r\n\x1b[32mTerminal ready. Connect to start SSH session.\x1b[0m\r\n');
+        });
+        
+        socket.on('terminal:data', ({ hostId, data }) => {
+            if (hostId === state.currentHostId) term.write(data);
+        });
+        
+        socket.on('terminal:error', ({ hostId, message }) => {
+             if (hostId === state.currentHostId) term.write(`\r\n\x1b[31mError: ${message}\x1b[0m\r\n`);
+        });
+
+        term.onData(data => {
+            if (state.currentHostId) {
+                socket.emit('terminal:input', { hostId: state.currentHostId, data });
+            }
+        });
+
+        // Helpers
+        function showToast(msg) {
+            els.toast.textContent = msg;
+            els.toast.classList.add('show');
+            setTimeout(() => els.toast.classList.remove('show'), 2000);
+        }
+
+        function setStatus(connected, text) {
+            els.statusDot.className = `status-dot ${connected ? 'green' : 'red'}`;
+            els.statusText.textContent = text || (connected ? 'Connected' : 'Disconnected');
+            if(connected) {
+                els.connectBtn.textContent = 'Re-Connect';
+                els.connectBtn.classList.remove('primary');
+                els.logoutBtn.style.display = 'flex';
+            } else {
+                els.connectBtn.textContent = 'Connect SSH';
+                els.connectBtn.classList.add('primary');
+                els.logoutBtn.style.display = 'none';
+            }
+        }
+
+        // --- Logic ---
+
+        // 1. Connection
+        els.connectBtn.onclick = async () => {
+            const host = document.getElementById('host').value;
+            const port = Number(document.getElementById('port').value);
+            const username = document.getElementById('user').value;
+            const password = document.getElementById('pass').value;
+            const manualMode = document.getElementById('manualMode').value;
+
+            if (!host) return showToast('Host IP required');
+            
+            els.connectBtn.disabled = true;
+            els.connectBtn.textContent = 'Connecting...';
+            setStatus(false, 'Connecting...');
+
+            try {
+                const res = await fetch('/api/hosts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ host, port, username, password, manualMode }),
+                });
+                const data = await res.json();
+
+                if (res.ok) {
+                    state.currentHostId = data.id;
+                    setStatus(true, `Connected (${data.detectedAdapter})`);
+                    term.clear();
+                    term.write(`\r\n\x1b[32mConnected to ${data.id}\x1b[0m\r\n`);
+                    socket.emit('join-host', { hostId: data.id });
+                    
+                    updateIpData(data.ips);
+                } else {
+                    throw new Error(data.error);
+                }
+            } catch (err) {
+                setStatus(false, 'Error');
+                term.write(`\r\n\x1b[31mConnection failed: ${err.message}\x1b[0m\r\n`);
+                showToast(err.message);
+            } finally {
+                els.connectBtn.disabled = false;
+            }
+        };
+
+        els.logoutBtn.onclick = async () => {
+            if (!state.currentHostId) return;
+            
+            try {
+                await fetch(`/api/hosts/${state.currentHostId}/logout`, { method: 'POST' });
+                showToast('Logged out');
+            } catch (e) {
+                console.error('Logout error:', e);
+            } finally {
+                // Regardless of API success, reset frontend state
+                state.currentHostId = null;
+                state.interfaces = [];
+                state.currentInterface = null;
+                state.ipData = { list: [], gateways: {} };
+                state.selectedIps.clear();
+                
+                setStatus(false);
+                term.clear();
+                term.write('\r\n\x1b[33mSession closed.\x1b[0m\r\n');
+                
+                // Clear UI
+                renderTabs();
+                renderIpTable();
+                els.calcResults.style.display = 'none';
+                els.applyBtn.style.display = 'none';
+                els.copyCmdBtn.style.display = 'none';
+                els.gatewaySection.style.display = 'none';
+            }
+        };
+
+        // 2. Fetch IPs
+        els.refreshIpsBtn.onclick = async () => {
+            if (!state.currentHostId) return showToast('Not connected');
+            try {
+                const res = await fetch(`/api/hosts/${state.currentHostId}/ips`);
+                const data = await res.json();
+                updateIpData(data);
+                showToast('Refreshed');
+            } catch(e) { showToast(e.message); }
+        };
+
+        function updateIpData(data) {
+            // data = { list: [], gateways: {} }
+            state.ipData = data;
+            
+            // Extract interfaces
+            const interfaces = new Set(data.list.map(i => i.iface));
+            // Add interfaces that have gateways but maybe no IPs yet
+            Object.keys(data.gateways).forEach(g => interfaces.add(g));
+            
+            state.interfaces = Array.from(interfaces).sort();
+            if (state.interfaces.length > 0 && !state.currentInterface) {
+                state.currentInterface = state.interfaces[0];
+            } else if (!state.interfaces.includes(state.currentInterface) && state.interfaces.length > 0) {
+                state.currentInterface = state.interfaces[0];
+            }
+            
+            renderTabs();
+            renderIpTable();
+        }
+
+        function renderTabs() {
+            els.interfaceTabs.innerHTML = '';
+            if (state.interfaces.length === 0) {
+                 els.interfaceTabs.innerHTML = '<div class="preset-tab">No Interfaces</div>';
+                 return;
+            }
+            state.interfaces.forEach(iface => {
+                const btn = document.createElement('button');
+                btn.className = `preset-tab ${state.currentInterface === iface ? 'active' : ''}`;
+                btn.textContent = iface;
+                btn.onclick = () => {
+                    state.currentInterface = iface;
+                    renderTabs();
+                    renderIpTable();
+                };
+                els.interfaceTabs.appendChild(btn);
+            });
+        }
+
+        function renderIpTable() {
+            els.ipTableBody.innerHTML = '';
+            state.selectedIps.clear();
+            updateBulkActions();
+            els.selectAllCheckbox.checked = false;
+
+            if (!state.currentInterface) return;
+
+            const ips = state.ipData.list.filter(i => i.iface === state.currentInterface);
+            const gateway = state.ipData.gateways[state.currentInterface];
+
+            document.getElementById('interfaceInfo').textContent = `${ips.length} IPs configured on ${state.currentInterface}`;
+            
+            // Update gateway field
+            els.gatewaySection.style.display = 'flex';
+            els.ifaceGateway.value = gateway || '';
+
+            if (ips.length === 0) {
+                 els.ipTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #999; padding: 20px;">No IPs configured on this interface</td></tr>';
+                 return;
+            }
+
+            ips.forEach(ip => {
+                const tr = document.createElement('tr');
+                const isGateway = gateway && ip.address.startsWith(gateway); // Simple check
+                
+                tr.innerHTML = `
+                    <td><input type="checkbox" class="ip-select" value="${ip.address}"></td>
+                    <td>${ip.address} <span class="badge ${ip.family === 'inet' ? 'blue' : 'grey'}">${ip.family}</span></td>
+                    <td>${gateway || '-'}</td>
+                    <td><span id="ping-${ip.address.replace(/[^a-zA-Z0-9]/g, '-')}" class="status-dot grey" title="Unknown"></span></td>
+                    <td style="text-align: right;">
+                        <button class="option" onclick="pingIp('${ip.address}')" style="padding: 2px 6px; font-size: 10px;">Ping</button>
+                    </td>
+                `;
+                els.ipTableBody.appendChild(tr);
+            });
+
+            // Bind checkbox events
+            document.querySelectorAll('.ip-select').forEach(cb => {
+                cb.addEventListener('change', (e) => {
+                    if (e.target.checked) state.selectedIps.add(e.target.value);
+                    else state.selectedIps.delete(e.target.value);
+                    updateBulkActions();
+                });
+            });
+        }
+
+        els.selectAllCheckbox.onchange = (e) => {
+            const checked = e.target.checked;
+            document.querySelectorAll('.ip-select').forEach(cb => {
+                cb.checked = checked;
+                if(checked) state.selectedIps.add(cb.value);
+                else state.selectedIps.delete(cb.value);
+            });
+            updateBulkActions();
+        };
+
+        function updateBulkActions() {
+            const count = state.selectedIps.size;
+            if (count > 0) {
+                els.deleteSelectedBtn.style.display = 'inline-block';
+                els.deleteSelectedBtn.textContent = `Delete Selected (${count})`;
+                els.pingSelectedBtn.style.display = 'inline-block';
+            } else {
+                els.deleteSelectedBtn.style.display = 'none';
+                els.pingSelectedBtn.style.display = 'none';
+            }
+        }
+
+        // 3. Calculator
+        els.calcBtn.onclick = async () => {
+            const input = document.getElementById('ipInput').value;
+            if (!input) return showToast('Input required');
+            
+            try {
+                const res = await fetch('/api/ip-calc', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ input }),
+                });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    state.calculatedIps = data;
+                    // Auto fill
+                    if (data.gateway && !document.getElementById('gatewayInput').value) {
+                         document.getElementById('gatewayInput').value = data.gateway;
+                    }
+                    if (data.mode === 'cidr') {
+                         const cidrParts = input.split('/');
+                         if (cidrParts.length > 1) document.getElementById('prefix').value = cidrParts[1];
+                    }
+
+                    // Show results
+                    els.calcResults.style.display = 'block';
+                    els.calcResults.innerHTML = `
+                        <div><strong>${data.hosts.length} usable IPs</strong> (Mode: ${data.mode})</div>
+                        <div style="margin-top:4px; font-size: 10px; color: #666; word-break: break-all;">
+                            ${data.hosts.join(', ')}
+                        </div>
+                    `;
+                    els.applyBtn.style.display = 'block';
+                    els.applyBtn.textContent = `Apply (${data.hosts.length})`;
+                    els.copyCmdBtn.style.display = 'block';
+                } else {
+                    showToast(data.error);
+                }
+            } catch (e) { showToast(e.message); }
+        };
+
+        // 4. Apply IPs & Copy Command
+        async function applyOrDryRun(isDryRun) {
+            const manualMode = document.getElementById('manualMode').value;
+            
+            if (!state.currentHostId) {
+                if (isDryRun && manualMode) {
+                    // Allowed to generate commands without SSH if manual mode is selected
+                } else {
+                    return showToast('Please connect first or select a Config Mode for Copy Cmd');
+                }
+            }
+            
+            const iface = state.currentInterface || 'eth0';
+            const input = document.getElementById('ipInput').value;
+            const gateway = document.getElementById('gatewayInput').value;
+            const prefix = Number(document.getElementById('prefix').value);
+            const dns = document.getElementById('dns').value.split(',').map(s => s.trim());
+            
+            if (!prefix) return showToast('Prefix is required');
+            if (!input && !state.calculatedIps) return showToast('Input is required');
+
+            const btn = isDryRun ? els.copyCmdBtn : els.applyBtn;
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = isDryRun ? 'Generating...' : 'Applying...';
+            
+            try {
+                const url = state.currentHostId 
+                    ? `/api/hosts/${state.currentHostId}/apply-ip`
+                    : `/api/dry-run-generate`;
+
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        input,
+                        iface: iface,
+                        dns,
+                        prefix,
+                        gateway,
+                        manualMode: manualMode, // Always send manualMode if available
+                        applyAll: true,
+                        dryRun: isDryRun
+                    }),
+                });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    if (isDryRun) {
+                        // Show modal
+                        openModal(data.commands);
+                    } else {
+                        showToast(`Successfully applied to ${iface}`);
+                        updateIpData(data.result);
+                        els.calcResults.style.display = 'none';
+                        els.applyBtn.style.display = 'none';
+                        els.copyCmdBtn.style.display = 'none';
+                    }
+                } else {
+                    showToast(`Failed: ${data.error}`);
+                }
+            } catch(e) { showToast(e.message); }
+            finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        }
+
+        els.applyBtn.onclick = () => applyOrDryRun(false);
+        els.copyCmdBtn.onclick = () => applyOrDryRun(true);
+
+        els.updateGatewayBtn.onclick = async () => {
+            if (!state.currentHostId) return showToast('Please connect first');
+            if (!state.currentInterface) return showToast('No interface selected');
+            
+            const gateway = els.ifaceGateway.value.trim();
+            if (!gateway) return showToast('Please enter a gateway address');
+
+            els.updateGatewayBtn.disabled = true;
+            els.updateGatewayBtn.textContent = '...';
+
+            try {
+                const res = await fetch(`/api/hosts/${state.currentHostId}/apply-ip`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        iface: state.currentInterface,
+                        gateway: gateway
+                    }),
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast(`Gateway updated for ${state.currentInterface}`);
+                    updateIpData(data.result || data); // result is returned if not dryRun
+                } else {
+                    showToast(`Failed: ${data.error}`);
+                }
+            } catch(e) { showToast(e.message); }
+            finally {
+                els.updateGatewayBtn.disabled = false;
+                els.updateGatewayBtn.textContent = 'Update';
+            }
+        };
+
+        // Modal Logic
+        window.closeModal = () => {
+            els.cmdModal.classList.remove('show');
+        };
+        
+        window.openModal = (content) => {
+            els.cmdContent.textContent = content;
+            els.cmdModal.classList.add('show');
+        };
+        
+        window.copyToClipboard = () => {
+            const text = els.cmdContent.textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('Copied to clipboard');
+                setTimeout(closeModal, 500);
+            }).catch(err => {
+                showToast('Failed to copy');
+            });
+        };
+
+        // 5. Delete IPs
+        els.deleteSelectedBtn.onclick = async () => {
+             const ips = Array.from(state.selectedIps);
+             if (!confirm(`Delete ${ips.length} IPs from ${state.currentInterface}?`)) return;
+             
+             try {
+                const res = await fetch(`/api/hosts/${state.currentHostId}/ips/${state.currentInterface}`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ addresses: ips })
+                });
+                const data = await res.json();
+                if(res.ok) {
+                    showToast('Deleted');
+                    updateIpData(data.result);
+                } else {
+                    showToast(data.error);
+                }
+             } catch(e) { showToast(e.message); }
+        };
+
+        // 6. Ping
+        window.pingIp = async (ipWithCidr) => {
+            const ip = ipWithCidr.split('/')[0];
+            const id = ipWithCidr.replace(/[^a-zA-Z0-9]/g, '-');
+            const el = document.getElementById(`ping-${id}`);
+            if(el) el.className = 'status-dot grey'; // Reset
+            
+            try {
+                const res = await fetch(`/api/hosts/${state.currentHostId}/ping`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip })
+                });
+                const data = await res.json();
+                if(el) {
+                    el.className = `status-dot ${data.success ? 'green' : 'red'}`;
+                    el.title = data.success ? `${data.latency}ms` : 'Failed';
+                }
+                if (data.success) showToast(`${ip}: ${data.latency}ms`);
+            } catch(e) { 
+                if(el) el.className = 'status-dot red';
+            }
+        };
+        
+        els.pingSelectedBtn.onclick = async () => {
+             const ips = Array.from(state.selectedIps);
+             showToast(`Pinging ${ips.length} IPs...`);
+             for (const ip of ips) {
+                 await window.pingIp(ip);
+             }
+        };
+
+        // --- Resizable Panels Logic ---
+        const resizer = document.getElementById('drag-resizer');
+        const leftPanel = document.getElementById('left-panel');
+        let isResizing = false;
+
+        resizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            resizer.classList.add('dragging');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            
+            const mainContainer = document.querySelector('.main-container');
+            const containerRect = mainContainer.getBoundingClientRect();
+            let newWidth = e.clientX - containerRect.left;
+            
+            // Apply limits (min 250, max 600)
+            if (newWidth < 250) newWidth = 250;
+            if (newWidth > 600) newWidth = 600;
+            
+            leftPanel.style.width = `${newWidth}px`;
+            
+            // Resize terminal
+            if (fitAddon) {
+                fitAddon.fit();
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                resizer.classList.remove('dragging');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                // Final fit
+                if (fitAddon) fitAddon.fit();
+            }
+        });
+
+    </script>
+</body>
+</html>
