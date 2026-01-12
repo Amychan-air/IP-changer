@@ -159,6 +159,24 @@ class SSHManager extends EventEmitter {
     return stdout;
   }
 
+  async listInterfaces(hostId) {
+    try {
+      const { stdout } = await this.exec(hostId, 'ip -o link show', false);
+      const lines = stdout.trim().split('\n').filter(Boolean);
+      return lines.map((line) => {
+        // example: 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> ...
+        const parts = line.split(':');
+        if (parts.length >= 2) {
+          return parts[1].trim();
+        }
+        return null;
+      }).filter(Boolean);
+    } catch (e) {
+      console.error('Error listing interfaces:', e);
+      return [];
+    }
+  }
+
   async listAddresses(hostId) {
     const { stdout } = await this.exec(hostId, 'ip -o addr show', false);
     const lines = stdout.trim().split('\n').filter(Boolean);

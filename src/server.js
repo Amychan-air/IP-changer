@@ -69,9 +69,10 @@ app.post('/api/hosts', async (req, res) => {
 
     // 立即获取 OS 信息和 IP 列表
     const osRelease = await sshManager.getOsRelease(hostId);
-    const [ips, gateways] = await Promise.all([
+    const [ips, gateways, interfaces] = await Promise.all([
       sshManager.listAddresses(hostId),
-      sshManager.getGateways(hostId)
+      sshManager.getGateways(hostId),
+      sshManager.listInterfaces(hostId)
     ]);
     
     await ensureAdapter(hostId, manualMode);
@@ -79,7 +80,7 @@ app.post('/api/hosts', async (req, res) => {
     return res.json({ 
       id: hostId, 
       osRelease, 
-      ips: { list: ips, gateways }, // 統一格式
+      ips: { list: ips, gateways, interfaces }, // 統一格式
       detectedAdapter: hosts.get(hostId).adapterName 
     });
   } catch (err) {
@@ -93,12 +94,13 @@ app.get('/api/hosts/:id/ips', async (req, res) => {
     if (!hosts.has(id)) return res.status(404).json({ error: '未找到主机' });
     
     // 平行執行兩個命令以提高效率
-    const [list, gateways] = await Promise.all([
+    const [list, gateways, interfaces] = await Promise.all([
       sshManager.listAddresses(id),
-      sshManager.getGateways(id)
+      sshManager.getGateways(id),
+      sshManager.listInterfaces(id)
     ]);
     
-    res.json({ list, gateways });
+    res.json({ list, gateways, interfaces });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -263,6 +265,12 @@ app.post('/api/hosts/:id/apply-ip', async (req, res) => {
       });
     }
 
+    // 获取完整状态以保持 UI 同步
+    const [gateways, interfaces] = await Promise.all([
+      sshManager.getGateways(id),
+      sshManager.listInterfaces(id)
+    ]);
+
     res.json({
       adapter: adapter.constructor.name,
       osRelease: hosts.get(id).osRelease,
@@ -273,7 +281,7 @@ app.post('/api/hosts/:id/apply-ip', async (req, res) => {
         dns,
       },
       availableHosts: parsedHosts,
-      result: applied,
+      result: { list: applied, gateways, interfaces },
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -293,7 +301,14 @@ app.delete('/api/hosts/:id/ips/:iface', async (req, res) => {
     } else {
       result = await adapter.clearIps(iface);
     }
-    res.json({ result });
+
+    // 获取完整状态以保持 UI 同步
+    const [gateways, interfaces] = await Promise.all([
+      sshManager.getGateways(id),
+      sshManager.listInterfaces(id)
+    ]);
+
+    res.json({ result: { list: result, gateways, interfaces } });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

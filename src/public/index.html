@@ -751,13 +751,23 @@
         };
 
         function updateIpData(data) {
-            // data = { list: [], gateways: {} }
+            // data = { list: [], gateways: {}, interfaces: [] }
+            // If data is just an array (legacy or specific update), normalize it
+            if (Array.isArray(data)) {
+                data = { list: data, gateways: state.ipData.gateways || {}, interfaces: state.ipData.interfaces || [] };
+            }
+            
             state.ipData = data;
             
             // Extract interfaces
-            const interfaces = new Set(data.list.map(i => i.iface));
-            // Add interfaces that have gateways but maybe no IPs yet
-            Object.keys(data.gateways).forEach(g => interfaces.add(g));
+            let interfaces;
+            if (data.interfaces && Array.isArray(data.interfaces) && data.interfaces.length > 0) {
+                interfaces = new Set(data.interfaces);
+            } else {
+                interfaces = new Set(data.list.map(i => i.iface));
+                // Add interfaces that have gateways but maybe no IPs yet
+                if (data.gateways) Object.keys(data.gateways).forEach(g => interfaces.add(g));
+            }
             
             state.interfaces = Array.from(interfaces).sort();
             if (state.interfaces.length > 0 && !state.currentInterface) {
