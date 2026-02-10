@@ -74,22 +74,49 @@ class InterfacesAdapter extends NetworkAdapter {
     // 組合新內容
     const finalContent = newLines.join('\n').trim() + '\n' + newBlock;
 
+    const numAliases = Math.max(0, addrs.length - 1);
+    const ifdownAliasCmds = [];
+    for (let i = 15; i >= 0; i--) {
+      ifdownAliasCmds.push(`ifdown ${cfg.iface}:${i} --force || true`);
+    }
+    const ifupAliasCmds = [];
+    for (let i = 0; i < numAliases; i++) {
+      ifupAliasCmds.push(`ifup ${cfg.iface}:${i}`);
+    }
+
     if (cfg.dryRun) {
+      const applyPreview = cfg.useRestartNetworking
+        ? `systemctl restart networking || service networking restart`
+        : [
+          ...ifdownAliasCmds,
+          `ifdown ${cfg.iface} --force || true`,
+          `ifup ${cfg.iface}`,
+          ...ifupAliasCmds
+        ].join('\n');
       return `
 # Modifying ${file}
 # New config for ${cfg.iface}:
 ${newBlock}
-# Using ifdown/ifup for surgical update:
-ifdown ${cfg.iface} --force || true
-ifup ${cfg.iface}
+# Commands that will run:
+${applyPreview}
 `;
     }
 
-    const cmd = `cat <<'EOF' | tee ${file} > /dev/null
+    // 寫文件前：先放下所有舊別名與主介面（先別名 :15..:0，再主介面）
+    const ifdownAll = [
+      ...ifdownAliasCmds,
+      `ifdown ${cfg.iface} --force || true`
+    ].join('\n');
+
+    const applyCmd = cfg.useRestartNetworking
+      ? `systemctl restart networking || service networking restart`
+      : `ifup ${cfg.iface}${numAliases > 0 ? '\n' + ifupAliasCmds.join('\n') : ''}`;
+
+    const cmd = `cat <<'INTERFACES_EOF' | tee ${file} > /dev/null
 ${finalContent}
-EOF
-ifdown ${cfg.iface} --force || true
-ifup ${cfg.iface}`;
+INTERFACES_EOF
+${ifdownAll}
+${applyCmd}`;
 
     const res = await this.ssh.exec(this.hostId, cmd);
     if (res.code !== 0) {
@@ -152,7 +179,7 @@ ifup ${cfg.iface}`;
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       
-      if (/^\\s*(auto|iface|allow-hotplug|mapping|source)/.test(line)) {
+      if (/^\s*(auto|iface|allow-hotplug|mapping|source)/.test(line)) {
         if (startRegex.test(line)) {
           skipping = true;
         } else {
@@ -179,11 +206,21 @@ ifup ${cfg.iface}`;
     }
     const finalContent = newLines.join('\n').trim() + '\n' + dhcpBlock;
 
-    const cmd = `cat <<'EOF' | tee ${file} > /dev/null
+    // 先放下所有別名 (:15..:0)，再主介面，然後寫文件，最後 ifup 主介面
+    const ifdownAliasCmds = [];
+    for (let i = 15; i >= 0; i--) {
+      ifdownAliasCmds.push(`ifdown ${iface}:${i} --force || true`);
+    }
+    const ifdownAll = [
+      ...ifdownAliasCmds,
+      `ifdown ${iface} --force || true`,
+      `ifup ${iface}`
+    ].join('\n');
+
+    const cmd = `cat <<'INTERFACES_EOF' | tee ${file} > /dev/null
 ${finalContent}
-EOF
-ifdown ${iface} --force || true
-ifup ${iface}`;
+INTERFACES_EOF
+${ifdownAll}`;
 
     await this.ssh.exec(this.hostId, cmd);
     return this.currentIPs();

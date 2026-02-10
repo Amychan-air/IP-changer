@@ -180,7 +180,7 @@ app.post('/api/dry-run-generate', async (req, res) => {
 
 app.post('/api/hosts/:id/apply-ip', async (req, res) => {
   const { id } = req.params;
-  const { input, iface = 'eth0', dns = [], prefix, manualMode, applyAll, addresses: directAddresses, gateway: manualGateway, dryRun } = req.body || {};
+  const { input, iface = 'eth0', dns = [], prefix, manualMode, applyAll, addresses: directAddresses, gateway: manualGateway, dryRun, useRestartNetworking = false } = req.body || {};
   if (!hosts.has(id)) return res.status(404).json({ error: '未找到主机' });
 
   try {
@@ -255,6 +255,7 @@ app.post('/api/hosts/:id/apply-ip', async (req, res) => {
       gateway: gateway,
       dns,
       dryRun,
+      useRestartNetworking,
     });
 
     if (dryRun) {

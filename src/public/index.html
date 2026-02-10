@@ -479,6 +479,12 @@
                                         <label class="selector-label">DNS Servers (comma separated)</label>
                                         <input id="dns" value="8.8.8.8, 1.1.1.1" />
                                     </div>
+                                    <div class="input-row" style="margin-bottom: 8px;">
+                                        <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+                                            <input type="checkbox" id="useRestartNetworking" />
+                                            <span>Apply via <code>systemctl restart networking</code> (Debian interfaces)</span>
+                                        </label>
+                                    </div>
                                 </div>
                                 <div style="width: 200px; display: flex; flex-direction: column; gap: 8px; justify-content: flex-end;">
                                     <button id="calcBtn" class="option" style="width: 100%;">Calculate / Preview</button>
@@ -952,7 +958,8 @@
                         gateway,
                         manualMode: manualMode, // Always send manualMode if available
                         applyAll: true,
-                        dryRun: isDryRun
+                        dryRun: isDryRun,
+                        useRestartNetworking: document.getElementById('useRestartNetworking').checked
                     }),
                 });
                 const data = await res.json();
