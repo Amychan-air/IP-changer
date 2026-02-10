@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP子网计算器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .calculator-section {
+            padding: 30px;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #eee;
+        }
+
+        .tab {
+            padding: 15px 30px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+        }
+
+        .tab.active {
+            color: #4facfe;
+            border-bottom-color: #4facfe;
+        }
+
+        .tab:hover {
+            background: #f8f9fa;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .input-group {
+            margin-bottom: 25px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .input-field {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .input-field input, .input-field select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s ease;
+        }
+
+        .input-field input:focus, .input-field select:focus {
+            outline: none;
+            border-color: #4facfe;
+        }
+
+        .calculate-btn {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .calculate-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .results {
+            margin-top: 30px;
+            display: none;
+        }
+
+        .results.show {
+            display: block;
+        }
+
+        .result-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .result-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #4facfe;
+        }
+
+        .result-card h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .result-item:last-child {
+            border-bottom: none;
+        }
+
+        .result-label {
+            font-weight: 600;
+            color: #666;
+        }
+
+        .result-value {
+            font-family: 'Courier New', monospace;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .host-range {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+        }
+
+        .host-range h4 {
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+
+                 .host-list {
+             font-family: 'Courier New', monospace;
+             color: #333;
+             line-height: 1.6;
+         }
+
+         .all-ips-list {
+             font-family: 'Courier New', monospace;
+             color: #333;
+             line-height: 1.8;
+             max-height: 400px;
+             overflow-y: auto;
+             background: white;
+             padding: 15px;
+             border-radius: 5px;
+             margin-top: 10px;
+             white-space: pre-wrap;
+             word-break: break-all;
+         }
+
+         .all-ips-list::-webkit-scrollbar {
+             width: 8px;
+         }
+
+         .all-ips-list::-webkit-scrollbar-track {
+             background: #f1f1f1;
+             border-radius: 4px;
+         }
+
+         .all-ips-list::-webkit-scrollbar-thumb {
+             background: #888;
+             border-radius: 4px;
+         }
+
+         .all-ips-list::-webkit-scrollbar-thumb:hover {
+             background: #555;
+         }
+
+         .copy-container {
+             display: flex;
+             align-items: center;
+             gap: 10px;
+             margin-top: 5px;
+         }
+         
+         .toggle-btn {
+             background: #28a745;
+             color: white;
+             border: none;
+             padding: 8px 15px;
+             border-radius: 4px;
+             font-size: 0.9em;
+             cursor: pointer;
+             transition: background-color 0.2s ease;
+             margin-top: 10px;
+         }
+
+         .toggle-btn:hover {
+             background: #218838;
+         }
+
+         .copy-btn {
+             background: #4facfe;
+             color: white;
+             border: none;
+             padding: 5px 10px;
+             border-radius: 4px;
+             font-size: 0.8em;
+             cursor: pointer;
+             transition: background-color 0.2s ease;
+         }
+
+         .copy-btn:hover {
+             background: #3a8bfe;
+         }
+
+         .copy-btn.copied {
+             background: #28a745;
+         }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border-left: 4px solid #f44336;
+        }
+
+        .info-section {
+            background: #e8f5e8;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 30px;
+        }
+
+        .info-section h3 {
+            color: #2e7d32;
+            margin-bottom: 15px;
+        }
+
+        .info-section p {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .input-row {
+                flex-direction: column;
+            }
+            
+            .input-field {
+                min-width: 100%;
+            }
+            
+            .result-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>IP子网计算器</h1>
+            <p>计算IPv4和IPv6子网信息，包括网络地址、可用主机范围、子网掩码等</p>
+        </div>
+
+        <div class="calculator-section">
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('ipv4')">IPv4子网计算器</button>
+                <button class="tab" onclick="switchTab('ipv6')">IPv6子网计算器</button>
+            </div>
+
+            <!-- IPv4 Calculator -->
+            <div id="ipv4" class="tab-content active">
+                <div class="info-section" style="margin-bottom: 20px; margin-top: 0;">
+                    <h3>使用方式</h3>
+                    <p><strong>方式1 - 分别输入：</strong>IP地址框输入 "192.168.1.1"，子网掩码框输入 "/24" 或 "255.255.255.0"</p>
+                    <p><strong>方式2 - CIDR格式：</strong>IP地址框直接输入 "192.168.1.1/24"，子网掩码框留空</p>
+                </div>
+                <div class="input-group">
+                    <label>网络类别:</label>
+                    <div class="input-row">
+                        <div class="input-field">
+                            <select id="ipv4-class">
+                                <option value="any">任意</option>
+                                <option value="A">A类</option>
+                                <option value="B">B类</option>
+                                <option value="C">C类</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>IP地址:</label>
+                    <div class="input-row">
+                        <div class="input-field">
+                                                         <input type="text" id="ipv4-address" placeholder="方式1: 192.168.1.1 或 方式2: 192.168.1.1/24" value="">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>子网掩码:</label>
+                    <div class="input-row">
+                        <div class="input-field">
+                                                         <input type="text" id="ipv4-subnet" placeholder="方式1: 255.255.255.0 或 /24 (方式2可留空)" value="">
+                        </div>
+                        <button class="calculate-btn" onclick="calculateIPv4()">计算</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- IPv6 Calculator -->
+            <div id="ipv6" class="tab-content">
+                <div class="input-group">
+                    <label>前缀长度:</label>
+                    <div class="input-row">
+                        <div class="input-field">
+                            <select id="ipv6-prefix">
+                                <option value="64">/64</option>
+                                <option value="48">/48</option>
+                                <option value="32">/32</option>
+                                <option value="128">/128</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>IPv6地址:</label>
+                    <div class="input-row">
+                        <div class="input-field">
+                            <input type="text" id="ipv6-address" placeholder="例如: 2001:db8::1" value="2001:db8::1">
+                        </div>
+                        <button class="calculate-btn" onclick="calculateIPv6()">计算</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div id="results" class="results">
+                <div id="results-content"></div>
+            </div>
+
+            <!-- Info Section -->
+            <div class="info-section">
+                <h3>关于子网计算</h3>
+                <p>子网是IP网络的一个分区，其中IP网络是互联网和其他类似网络上使用的通信协议集。它通常被称为TCP/IP（传输控制协议/互联网协议）。</p>
+                <p>将网络划分为至少两个独立网络的行为称为子网划分，路由器是允许子网络之间流量交换的设备，作为物理边界。</p>
+                <p>IP地址由网络号（路由前缀）和其余字段（主机标识符）组成。其余字段是特定于给定主机或网络接口的标识符。</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(tabName) {
+            // Hide all tab contents
+            const tabContents = document.querySelectorAll('.tab-content');
+            tabContents.forEach(content => content.classList.remove('active'));
+            
+            // Remove active class from all tabs
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+            
+            // Hide results when switching tabs
+            document.getElementById('results').classList.remove('show');
+        }
+
+        function validateIPv4(ip) {
+            const parts = ip.split('.');
+            if (parts.length !== 4) return false;
+            
+            for (let part of parts) {
+                const num = parseInt(part);
+                if (isNaN(num) || num < 0 || num > 255) return false;
+            }
+            return true;
+        }
+
+        function validateIPv6(ip) {
+            const ipv6Regex = /^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^::1$|^::$|^([0-9a-fA-F]{1,4}:){0,7}:[0-9a-fA-F]{1,4}$|^([0-9a-fA-F]{1,4}:){1,7}:$|^:([0-9a-fA-F]{1,4}:){1,6}$/;
+            return ipv6Regex.test(ip);
+        }
+
+                 function parseSubnetMask(subnet) {
+             if (subnet.startsWith('/')) {
+                 const prefix = parseInt(subnet.substring(1));
+                 if (prefix < 0 || prefix > 32) return null;
+                 
+                 let mask = 0;
+                 for (let i = 0; i < prefix; i++) {
+                     mask |= (1 << (31 - i));
+                 }
+                 
+                 return [
+                     (mask >>> 24) & 255,
+                     (mask >>> 16) & 255,
+                     (mask >>> 8) & 255,
+                     mask & 255
+                 ];
+             } else {
+                 const parts = subnet.split('.');
+                 if (parts.length !== 4) return null;
+                 
+                 const mask = parts.map(part => parseInt(part));
+                 for (let part of mask) {
+                     if (isNaN(part) || part < 0 || part > 255) return null;
+                 }
+                 return mask;
+             }
+         }
+
+         function parseCIDR(input) {
+             // 检查是否是CIDR格式 (例如: 192.168.1.1/24)
+             const cidrMatch = input.match(/^(\d+\.\d+\.\d+\.\d+)\/(\d+)$/);
+             if (cidrMatch) {
+                 return {
+                     ip: cidrMatch[1],
+                     subnet: '/' + cidrMatch[2]
+                 };
+             }
+             return null;
+         }
+
+        function ipToNumber(ip) {
+            const parts = ip.split('.').map(part => parseInt(part));
+            return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
+        }
+
+        function numberToIp(num) {
+            return [
+                (num >>> 24) & 255,
+                (num >>> 16) & 255,
+                (num >>> 8) & 255,
+                num & 255
+            ].join('.');
+        }
+
+        function getNetworkClass(ip) {
+            const firstOctet = parseInt(ip.split('.')[0]);
+            if (firstOctet >= 1 && firstOctet <= 126) return 'A';
+            if (firstOctet >= 128 && firstOctet <= 191) return 'B';
+            if (firstOctet >= 192 && firstOctet <= 223) return 'C';
+            if (firstOctet >= 224 && firstOctet <= 239) return 'D';
+            if (firstOctet >= 240 && firstOctet <= 255) return 'E';
+            return 'Unknown';
+        }
+
+                 function calculateIPv4() {
+             let ip = document.getElementById('ipv4-address').value.trim();
+             let subnet = document.getElementById('ipv4-subnet').value.trim();
+             
+             // 方式2：检查IP地址框是否包含CIDR格式
+             const cidrResult = parseCIDR(ip);
+             if (cidrResult) {
+                 // CIDR格式输入
+                 ip = cidrResult.ip;
+                 subnet = cidrResult.subnet;
+                 // 更新输入框显示
+                 document.getElementById('ipv4-address').value = ip;
+                 document.getElementById('ipv4-subnet').value = subnet;
+             } else {
+                 // 方式1：分别输入，检查子网掩码框是否为空
+                 if (!subnet) {
+                     showError('请输入子网掩码，或使用CIDR格式 (如 192.168.1.1/24)');
+                     return;
+                 }
+             }
+             
+             if (!validateIPv4(ip)) {
+                 showError('请输入有效的IPv4地址');
+                 return;
+             }
+             
+             const subnetMask = parseSubnetMask(subnet);
+             if (!subnetMask) {
+                 showError('请输入有效的子网掩码');
+                 return;
+             }
+            
+            const ipNum = ipToNumber(ip);
+            const maskNum = ipToNumber(subnetMask.join('.'));
+            const networkNum = ipNum & maskNum;
+            const broadcastNum = networkNum | (~maskNum >>> 0);
+            
+            const prefixLength = subnetMask.reduce((count, octet) => {
+                return count + octet.toString(2).split('1').length - 1;
+            }, 0);
+            
+            const usableHosts = Math.pow(2, 32 - prefixLength) - 2;
+            
+                         // 计算其他主机的范围格式
+             let otherHostsRange = '';
+             if (usableHosts > 1) {
+                 const secondHost = numberToIp(networkNum + 2);
+                 const lastHost = numberToIp(broadcastNum - 1);
+                 
+                 if (secondHost === lastHost) {
+                     otherHostsRange = secondHost;
+                 } else {
+                     // 提取网络部分和主机部分
+                     const networkPart = secondHost.substring(0, secondHost.lastIndexOf('.') + 1);
+                     const startHost = secondHost.split('.').pop();
+                     const endHost = lastHost.split('.').pop();
+                     otherHostsRange = `${networkPart}${startHost}-${endHost}`;
+                 }
+             } else if (usableHosts === 1) {
+                 otherHostsRange = '无其他可用主机';
+             } else {
+                 otherHostsRange = '无可用主机';
+             }
+             
+             const results = {
+                 ipAddress: ip,
+                 subnetMask: subnetMask.join('.'),
+                 prefixLength: '/' + prefixLength,
+                 networkClass: getNetworkClass(ip),
+                 networkAddress: numberToIp(networkNum),
+                 broadcastAddress: numberToIp(broadcastNum),
+                 firstUsableHost: numberToIp(networkNum + 1),
+                 lastUsableHost: numberToIp(broadcastNum - 1),
+                 otherHostsRange: otherHostsRange,
+                 totalHosts: Math.pow(2, 32 - prefixLength),
+                 usableHosts: usableHosts
+             };
+            
+            displayResults(results, 'ipv4');
+        }
+
+        function calculateIPv6() {
+            const ip = document.getElementById('ipv6-address').value.trim();
+            const prefix = parseInt(document.getElementById('ipv6-prefix').value);
+            
+            if (!validateIPv6(ip)) {
+                showError('请输入有效的IPv6地址');
+                return;
+            }
+            
+            // Simplified IPv6 calculation
+            const results = {
+                ipAddress: ip,
+                prefixLength: '/' + prefix,
+                networkAddress: ip.split(':').slice(0, prefix/16).join(':') + '::',
+                totalHosts: Math.pow(2, 128 - prefix),
+                usableHosts: Math.pow(2, 128 - prefix) - 2
+            };
+            
+            displayResults(results, 'ipv6');
+        }
+
+        function displayResults(results, type) {
+            const resultsDiv = document.getElementById('results-content');
+            let html = '<div class="result-grid">';
+            
+            if (type === 'ipv4') {
+                html += `
+                    <div class="result-card">
+                        <h3>基本信息</h3>
+                        <div class="result-item">
+                            <span class="result-label">IP地址:</span>
+                            <span class="result-value">${results.ipAddress}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">子网掩码:</span>
+                            <span class="result-value">${results.subnetMask}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">前缀长度:</span>
+                            <span class="result-value">${results.prefixLength}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">网络类别:</span>
+                            <span class="result-value">${results.networkClass}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="result-card">
+                        <h3>网络地址</h3>
+                        <div class="result-item">
+                            <span class="result-label">网络地址:</span>
+                            <span class="result-value">${results.networkAddress}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">广播地址:</span>
+                            <span class="result-value">${results.broadcastAddress}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="result-card">
+                        <h3>主机信息</h3>
+                        <div class="result-item">
+                            <span class="result-label">总主机数:</span>
+                            <span class="result-value">${results.totalHosts.toLocaleString()}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">可用主机数:</span>
+                            <span class="result-value">${results.usableHosts.toLocaleString()}</span>
+                        </div>
+                    </div>
+                `;
+                
+                                 if (results.usableHosts > 0) {
+                    // 生成所有 IP 地址列表
+                    const allIPs = generateAllIPs(results.networkAddress, results.broadcastAddress);
+                    const ipListText = allIPs.join('\n');
+                    
+                    html += `
+                        <div class="result-card">
+                            <h3>可用主机范围</h3>
+                            <div class="host-range">
+                                <h4>路由器IP (第一个可用主机):</h4>
+                                <div class="host-list">${results.firstUsableHost}</div>
+                                <h4>其他可用主机:</h4>
+                                <div class="copy-container">
+                                    <div class="host-list">${results.otherHostsRange}</div>
+                                    <button class="copy-btn" onclick="copyToClipboard('${results.otherHostsRange}', this)">复制</button>
+                                </div>
+                                <button class="toggle-btn" onclick="toggleAllIPs('ip-list-container')">显示所有IP地址</button>
+                                <div id="ip-list-container" style="display: none;">
+                                    <div class="copy-container" style="margin-top: 10px;">
+                                        <button class="copy-btn" onclick="copyAllIPs('${results.networkAddress}', '${results.broadcastAddress}', this)">复制全部IP</button>
+                                    </div>
+                                    <div class="all-ips-list">${ipListText}</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            } else {
+                html += `
+                    <div class="result-card">
+                        <h3>IPv6信息</h3>
+                        <div class="result-item">
+                            <span class="result-label">IPv6地址:</span>
+                            <span class="result-value">${results.ipAddress}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">前缀长度:</span>
+                            <span class="result-value">${results.prefixLength}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">网络地址:</span>
+                            <span class="result-value">${results.networkAddress}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="result-card">
+                        <h3>主机信息</h3>
+                        <div class="result-item">
+                            <span class="result-label">总主机数:</span>
+                            <span class="result-value">${results.totalHosts.toExponential()}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">可用主机数:</span>
+                            <span class="result-value">${results.usableHosts.toExponential()}</span>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            html += '</div>';
+            resultsDiv.innerHTML = html;
+            document.getElementById('results').classList.add('show');
+        }
+
+                 function showError(message) {
+             const resultsDiv = document.getElementById('results-content');
+             resultsDiv.innerHTML = `<div class="error">${message}</div>`;
+             document.getElementById('results').classList.add('show');
+         }
+
+         function generateAllIPs(networkAddress, broadcastAddress) {
+             const networkNum = ipToNumber(networkAddress);
+             const broadcastNum = ipToNumber(broadcastAddress);
+             const allIPs = [];
+             
+             // 生成所有可用主机IP（排除网络地址和广播地址）
+             for (let i = networkNum + 1; i < broadcastNum; i++) {
+                 allIPs.push(numberToIp(i));
+             }
+             
+             return allIPs;
+         }
+
+         function toggleAllIPs(containerId) {
+             const container = document.getElementById(containerId);
+             const button = event.target;
+             
+             if (container.style.display === 'none') {
+                 container.style.display = 'block';
+                 button.textContent = '隐藏所有IP地址';
+             } else {
+                 container.style.display = 'none';
+                 button.textContent = '显示所有IP地址';
+             }
+         }
+
+         function copyAllIPs(networkAddress, broadcastAddress, button) {
+             const allIPs = generateAllIPs(networkAddress, broadcastAddress);
+             const ipListText = allIPs.join('\n');
+             
+             navigator.clipboard.writeText(ipListText).then(function() {
+                 button.textContent = '已复制!';
+                 button.classList.add('copied');
+                 setTimeout(() => {
+                     button.textContent = '复制全部IP';
+                     button.classList.remove('copied');
+                 }, 2000);
+             }).catch(function(err) {
+                 console.error('复制失败: ', err);
+                 // 备用复制方法
+                 const textArea = document.createElement('textarea');
+                 textArea.value = ipListText;
+                 document.body.appendChild(textArea);
+                 textArea.select();
+                 document.execCommand('copy');
+                 document.body.removeChild(textArea);
+                 
+                 button.textContent = '已复制!';
+                 button.classList.add('copied');
+                 setTimeout(() => {
+                     button.textContent = '复制全部IP';
+                     button.classList.remove('copied');
+                 }, 2000);
+             });
+         }
+
+         function copyToClipboard(text, button) {
+             navigator.clipboard.writeText(text).then(function() {
+                 // 更新被点击的按钮状态
+                 button.textContent = '已复制!';
+                 button.classList.add('copied');
+                 setTimeout(() => {
+                     button.textContent = '复制';
+                     button.classList.remove('copied');
+                 }, 2000);
+             }).catch(function(err) {
+                 console.error('复制失败: ', err);
+                 // 备用复制方法
+                 const textArea = document.createElement('textarea');
+                 textArea.value = text;
+                 document.body.appendChild(textArea);
+                 textArea.select();
+                 document.execCommand('copy');
+                 document.body.removeChild(textArea);
+                 
+                 // 更新被点击的按钮状态
+                 button.textContent = '已复制!';
+                 button.classList.add('copied');
+                 setTimeout(() => {
+                     button.textContent = '复制';
+                     button.classList.remove('copied');
+                 }, 2000);
+             });
+         }
+
+        // Add event listeners for Enter key
+        document.getElementById('ipv4-address').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') calculateIPv4();
+        });
+        
+        document.getElementById('ipv4-subnet').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') calculateIPv4();
+        });
+        
+        document.getElementById('ipv6-address').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') calculateIPv6();
+        });
+    </script>
+</body>
+</html>

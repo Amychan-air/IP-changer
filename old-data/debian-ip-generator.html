@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Debian 12 靜態 IP 配置生成器（/etc/network/interfaces）</title>
+  <style>
+    body { font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji"; margin: 24px; line-height: 1.5; }
+    h1 { font-size: 20px; margin-bottom: 12px; }
+    .row { margin-bottom: 12px; }
+    label { display: block; font-weight: 600; margin-bottom: 4px; }
+    input, textarea, select { width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+    textarea { min-height: 120px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    .inline { display: flex; gap: 12px; }
+    .inline .col { flex: 1; }
+    button { padding: 8px 12px; border: 1px solid #999; background: #111; color: #fff; border-radius: 6px; cursor: pointer; }
+    button.secondary { background: #f5f5f5; color: #111; border-color: #ccc; }
+    .muted { color: #666; font-size: 12px; }
+    pre { background: #0b1020; color: #d1e7ff; padding: 12px; border-radius: 8px; overflow: auto; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  </style>
+  <meta name="description" content="在 Debian 12 用 /etc/network/interfaces 生成設定靜態 IPv4、預設閘道與 DNS 的配置。">
+</head>
+<body>
+  <h1>Debian 12 靜態 IP 配置生成器</h1>
+
+  <div class="muted">輸入 IPv4、前綴（CIDR）、預設閘道與 DNS，生成 /etc/network/interfaces 格式的配置文件。</div>
+
+  <div class="inline row">
+    <div class="col">
+      <label for="iface">網卡名稱（interface，如 eno1、eth0、enp0s3）</label>
+      <input id="iface" type="text" placeholder="例如：eno1 或 eth0">
+      <div class="muted">可用 <code>ip link show</code> 或 <code>ip a</code> 查詢。</div>
+    </div>
+    <div class="col">
+      <label for="hotplug">啟動方式</label>
+      <select id="hotplug">
+        <option value="allow-hotplug">allow-hotplug（推薦）</option>
+        <option value="auto">auto（開機自動啟動）</option>
+      </select>
+      <div class="muted">allow-hotplug 會在網卡插入時自動啟動。</div>
+    </div>
+  </div>
+
+  <div class="inline row">
+    <div class="col">
+      <label for="cidr">前綴長度（CIDR，如 24、26、29、30）</label>
+      <input id="cidr" type="number" min="1" max="32" value="24">
+    </div>
+    <div class="col">
+      <label for="gateway">預設閘道（gateway）</label>
+      <input id="gateway" type="text" placeholder="例如：192.168.1.1">
+    </div>
+  </div>
+
+  <div class="row">
+    <label for="ips">IPv4 位址（每行一個；支援最後段範圍，如 192.168.1.50-80；不含前綴）</label>
+    <textarea id="ips" placeholder="例如：
+192.168.1.50
+192.168.1.60-80"></textarea>
+  </div>
+
+  <div class="row">
+    <label for="dns">DNS 伺服器（以空格或換行分隔）</label>
+    <textarea id="dns" placeholder="例如：
+8.8.8.8 1.1.1.1"></textarea>
+  </div>
+
+  <div class="inline row">
+    <button id="generate">生成配置</button>
+    <button id="copy" class="secondary">複製配置</button>
+  </div>
+
+  <div class="row">
+    <label>輸出（/etc/network/interfaces 格式）</label>
+    <pre><code id="output" spellcheck="false"></code></pre>
+  </div>
+
+  <div class="row">
+    <label>配置說明</label>
+    <pre><code id="instructions" spellcheck="false"></code></pre>
+  </div>
+
+  <script>
+    function isValidIp(ip) {
+      const parts = ip.trim().split('.')
+      if (parts.length !== 4) return false
+      return parts.every(p => {
+        if (!/^\d+$/.test(p)) return false
+        const n = Number(p)
+        return n >= 0 && n <= 255
+      })
+    }
+
+    function parseList(text) {
+      return text
+        .split(/\r?\n|\s+/)
+        .map(s => s.trim())
+        .filter(s => s.length > 0)
+    }
+
+    function uniqueKeepOrder(arr) {
+      const seen = new Set()
+      const out = []
+      for (const v of arr) {
+        if (!seen.has(v)) { seen.add(v); out.push(v) }
+      }
+      return out
+    }
+
+    function expandIpOrRange(token) {
+      const s = token.trim()
+      if (isValidIp(s)) return [s]
+      const m = s.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})-(\d{1,3})$/)
+      if (!m) return []
+      const a = Number(m[1])
+      const b = Number(m[2])
+      const c = Number(m[3])
+      const start = Number(m[4])
+      const end = Number(m[5])
+      const inRange = (n) => n >= 0 && n <= 255
+      if (![a, b, c, start, end].every(inRange)) return []
+      if (end < start) return []
+      const ips = []
+      for (let i = start; i <= end; i++) {
+        ips.push(`${a}.${b}.${c}.${i}`)
+      }
+      return ips
+    }
+
+    function expandIpList(text) {
+      const tokens = parseList(text)
+      const out = []
+      for (const t of tokens) {
+        const expanded = expandIpOrRange(t)
+        for (const ip of expanded) out.push(ip)
+      }
+      return out
+    }
+
+    function buildDebianConfig(ipList, cidr, gateway, iface, hotplug, dnsList) {
+      const lines = []
+      
+      lines.push(`# This file describes the network interfaces available on your system`)
+      lines.push(`# and how to activate them. For more information, see interfaces(5).`)
+      lines.push(``)
+      lines.push(`source /etc/network/interfaces.d/*`)
+      lines.push(``)
+      lines.push(`# The loopback network interface`)
+      lines.push(`auto lo`)
+      lines.push(`iface lo inet loopback`)
+      lines.push(``)
+      lines.push(`# The primary network interface`)
+      lines.push(`${hotplug} ${iface}`)
+      lines.push(`iface ${iface} inet static`)
+      
+      // First IP address
+      lines.push(`        address ${ipList[0]}/${cidr}`)
+      
+      // Additional IP addresses (using up command)
+      for (let i = 1; i < ipList.length; i++) {
+        lines.push(`        up ip addr add ${ipList[i]}/${cidr} dev ${iface}`)
+        lines.push(`        down ip addr del ${ipList[i]}/${cidr} dev ${iface}`)
+      }
+      
+      lines.push(`        gateway ${gateway}`)
+      
+      if (dnsList.length > 0) {
+        lines.push(`        # dns-* options are implemented by the resolvconf package, if installed`)
+        lines.push(`        dns-nameservers ${dnsList.join(' ')}`)
+      }
+
+      return lines.join('\n')
+    }
+
+    function buildInstructions(iface) {
+      const lines = []
+      lines.push(`# 套用配置的步驟：`)
+      lines.push(``)
+      lines.push(`1. 備份原配置文件：`)
+      lines.push(`   sudo cp /etc/network/interfaces /etc/network/interfaces.backup`)
+      lines.push(``)
+      lines.push(`2. 編輯配置文件：`)
+      lines.push(`   sudo nano /etc/network/interfaces`)
+      lines.push(`   （將上方生成的內容貼入）`)
+      lines.push(``)
+      lines.push(`3. 重啟網路服務：`)
+      lines.push(`   sudo systemctl restart networking`)
+      lines.push(`   # 或者`)
+      lines.push(`   sudo ifdown ${iface || '<interface>'} && sudo ifup ${iface || '<interface>'}`)
+      lines.push(``)
+      lines.push(`4. 驗證配置：`)
+      lines.push(`   ip a`)
+      lines.push(`   ip r`)
+      lines.push(`   cat /etc/resolv.conf`)
+      lines.push(``)
+      lines.push(`# 注意事項：`)
+      lines.push(`- 如果使用 SSH 連線，建議先在本地測試或準備備用連線方式`)
+      lines.push(`- 確保 IP 位址、閘道與 DNS 設定正確`)
+      lines.push(`- 某些情況下可能需要重啟系統才能完全生效`)
+      
+      return lines.join('\n')
+    }
+
+    function generate() {
+      const iface = document.getElementById('iface').value.trim()
+      const hotplug = document.getElementById('hotplug').value
+      const cidr = Number(document.getElementById('cidr').value || 24)
+      const gateway = document.getElementById('gateway').value.trim()
+      const ipsRaw = document.getElementById('ips').value
+      const dnsRaw = document.getElementById('dns').value
+
+      if (!iface) {
+        alert('請輸入網卡名稱（例如 eno1 或 eth0）。')
+        return
+      }
+
+      if (!(cidr >= 1 && cidr <= 32)) {
+        alert('CIDR 前綴長度需介於 1-32。')
+        return
+      }
+
+      const ipList = uniqueKeepOrder(expandIpList(ipsRaw))
+      if (ipList.length === 0) {
+        alert('請至少輸入一個有效 IPv4 位址或範圍（例如 192.168.1.50-80）。')
+        return
+      }
+      if (!isValidIp(gateway)) {
+        alert('請輸入有效的預設閘道（IPv4）。')
+        return
+      }
+
+      const dnsList = uniqueKeepOrder(parseList(dnsRaw).filter(isValidIp))
+
+      const config = buildDebianConfig(ipList, cidr, gateway, iface, hotplug, dnsList)
+      const instructions = buildInstructions(iface)
+      
+      document.getElementById('output').textContent = config
+      document.getElementById('instructions').textContent = instructions
+    }
+
+    document.getElementById('generate').addEventListener('click', generate)
+    document.getElementById('copy').addEventListener('click', async () => {
+      const text = document.getElementById('output').textContent
+      if (!text) return
+      try {
+        await navigator.clipboard.writeText(text)
+        alert('已複製到剪貼簿！')
+      } catch (e) {
+        const ta = document.createElement('textarea')
+        ta.value = text
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+        alert('已複製到剪貼簿！')
+      }
+    })
+  </script>
+</body>
+</html>
+
